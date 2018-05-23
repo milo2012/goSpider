@@ -44,7 +44,7 @@ var http_client *http.Client
 var orignalURL=""
 
 var (
-	start_url = flag.String("url", "", "URL to start scraping from")
+	start_url = flag.String("u", "", "URL to start scraping from")
 	max_threads = flag.Int("n", 8, "number of concurrent threads (def. 8)")
 	max_urls_per_domain = flag.Int("mu", 5, "maximum number of links to spider per hostname (def. 5)")
 	verbose = flag.Bool("v", false, "verbose (def. false)")
@@ -746,6 +746,10 @@ func main() {
 	fmt.Printf("\n")
 	var tmpUrlList []string
 
+	if len(*start_url)<1 {
+		fmt.Println("[-] Please enter a URL using the -u parameter")
+		os.Exit(3)
+	}
 	if len(*logFilename)>0 {
 		logfileF, err := os.OpenFile(*logFilename, os.O_WRONLY|os.O_CREATE|os.O_APPEND,0644)
 		if err != nil {
