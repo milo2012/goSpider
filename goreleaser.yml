@@ -1,0 +1,17 @@
+build:
+  main: ./goSpider.go
+  goos:
+    - linux
+    - darwin
+    - windows
+  goarch:
+    - 386
+    - amd64
+    - arm
+    - arm64
+brew:
+  github:
+    owner: milo2012
+    name: homebrew-tap
+  folder: Formula
+
