@@ -65,33 +65,43 @@ func stringInArray(s string, sa []string) (bool) {
 	return false
 }
 func checkStatusCode(newUrl string) (bool) {
-	var timeoutSec=5
-	var userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36"
-	timeout := time.Duration(time.Duration(timeoutSec) * time.Second)
-	client := http.Client{
-		Timeout: timeout,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-        	return http.ErrUseLastResponse
-    	},		
-	}
-	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	req, err := http.NewRequest("GET", newUrl, nil)
-	if err==nil {
-		req.Header.Add("User-Agent", userAgent)
-		resp, err := client.Do(req)		
-		if err==nil{					
-			if resp.StatusCode!=200 && resp.StatusCode!=401 && resp.StatusCode!=405{
-				return false 
+	if !strings.Contains(newUrl," ") { 
+		var timeoutSec=5
+		var userAgent = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36"
+		timeout := time.Duration(time.Duration(timeoutSec) * time.Second)
+		client := http.Client{
+			Timeout: timeout,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				return http.ErrUseLastResponse
+			},		
+		}
+		http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+		req, err := http.NewRequest("GET", newUrl, nil)
+		if err==nil {
+			req.Header.Add("User-Agent", userAgent)
+			resp, err := client.Do(req)		
+			if err==nil{				
+				finalURL := resp.Request.URL.String()
+				if finalURL==newUrl {
+					//fmt.Println(newUrl+"\t"+strconv.Itoa(resp.StatusCode))	
+					if resp.StatusCode!=200 && resp.StatusCode!=401 && resp.StatusCode!=405{
+						return false 
+					} else {
+						return true
+					}
+				} else {
+					return false
+				}
 			} else {
-				return true
+				return false
 			}
 		} else {
 			return false
 		}
+		return false
 	} else {
 		return false
 	}
-	return false
 }
 
 func get_html(u string) ([]byte, error) {
@@ -325,7 +335,7 @@ func find_all_urls(u string, b []byte) ([]string) {
 						tmpFinalList=append(tmpFinalList,scriptURL)
 					}						
 					var bodyBytes=getBody(scriptURL)
-
+					
 					r2, _ := regexp.Compile(`((?:[a-zA-Z]{1,10}://|//)[^"'/]{1,}\.[a-zA-Z]{2,}[^"']{0,})`)
 					urls2 := r2.FindAllSubmatch(bodyBytes,-1)
 					for _, x1 := range urls2 {
@@ -339,10 +349,12 @@ func find_all_urls(u string, b []byte) ([]string) {
 								newUrl=splitStr[0]
 								if strings.Contains(newUrl," ") {
 									if !stringInSlice(newUrl,tmpFinalList) {
-										if checkStatusCode(newUrl)==true {
-											fmt.Println("[javascript] "+newUrl)												
-											log.Println("[javascript] "+newUrl)												
-											tmpFinalList=append(tmpFinalList,newUrl)
+										if newUrl!=orignalURL+"/" {
+											if checkStatusCode(newUrl)==true {																						
+												fmt.Println("[javascript] "+newUrl)												
+												log.Println("[javascript] "+newUrl)												
+												tmpFinalList=append(tmpFinalList,newUrl)
+											}
 										}
 									}
 								}
@@ -363,9 +375,11 @@ func find_all_urls(u string, b []byte) ([]string) {
 						}
 						if !stringInSlice(newUrl,tmpFinalList) {
 							if checkStatusCode(newUrl)==true {
-								fmt.Println("[javascript] "+newUrl)
-								log.Println(newUrl)
-								tmpFinalList=append(tmpFinalList,newUrl)
+								if newUrl!=orignalURL+"/" {
+									fmt.Println("[javascript] "+newUrl)
+									log.Println(newUrl)
+									tmpFinalList=append(tmpFinalList,newUrl)
+								}
 							}
 						}
 						if !stringInSlice(newUrl,tmpFinalList) {
@@ -380,10 +394,12 @@ func find_all_urls(u string, b []byte) ([]string) {
 								splitStr :=strings.Split(newUrl,"\n")
 								newUrl=splitStr[0]
 								if !stringInSlice(newUrl,tmpFinalList) {
-									if checkStatusCode(newUrl)==true {
-										fmt.Println("[javascript] "+newUrl)								
-										log.Println(newUrl)								
-										tmpFinalList=append(tmpFinalList,newUrl)
+									if newUrl!=orignalURL+"/" {
+										if checkStatusCode(newUrl)==true {
+											fmt.Println("[javascript] "+newUrl)								
+											log.Println(newUrl)								
+											tmpFinalList=append(tmpFinalList,newUrl)
+										}
 									}
 								}
 							}
@@ -494,6 +510,19 @@ func find_all_urls(u string, b []byte) ([]string) {
 		}
 	}
 	*/
+	r2, _ := regexp.Compile(`[url|URL]=(.+?")`)
+	urls2 := r2.FindAllSubmatch(b,-1)
+	for _, ua := range urls2 {	
+		tmpLen := len(string(ua[1]))
+		var x = string(ua[1][0:tmpLen-1])
+		if !strings.HasPrefix(x,"/") {
+			tmpUrl1 := orignalURL+"/"+x
+			rurls = append(rurls, tmpUrl1)
+		} else {
+			tmpUrl1 := orignalURL+x
+			rurls = append(rurls, tmpUrl1)
+		}
+	}
 
 	for _, tmpUrl := range rurls {
 		if strings.Contains(tmpUrl,domainName) {
@@ -749,7 +778,8 @@ func main() {
 	if len(*start_url)<1 {
 		fmt.Println("[-] Please enter a URL using the -u parameter")
 		os.Exit(3)
-	}
+	}	
+	
 	if len(*logFilename)>0 {
 		logfileF, err := os.OpenFile(*logFilename, os.O_WRONLY|os.O_CREATE|os.O_APPEND,0644)
 		if err != nil {
@@ -758,6 +788,7 @@ func main() {
 		defer logfileF.Close()
 		log.SetOutput(logfileF)
 		fmt.Println("[*] Writing results to: "+*logFilename)
+
 	} else {
 		var tmpList1 = strings.Split(*start_url,"://")
 		var tmpLogFilename="crawl_"+tmpList1[0]+"_"+tmpList1[1]+".log"
@@ -778,6 +809,7 @@ func main() {
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	resp, err := http.Get(*start_url)
     if err != nil {
+
         log.Fatalf("http.Get => %v", err.Error())
     }
 	finalURL := resp.Request.URL.String()
